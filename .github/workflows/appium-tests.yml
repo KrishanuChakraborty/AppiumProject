@@ -24,20 +24,20 @@ jobs:
       - name: Install Android SDK packages
         run: |
           sdkmanager "platform-tools"
-          sdkmanager "platforms;android-37"
-          sdkmanager "system-images;android-37;google_apis;x86_64"
+          sdkmanager "platforms;android-36"
+          sdkmanager "system-images;android-36;google_apis;x86_64"
 
       - name: Create Android emulator
         run: |
           echo "no" | avdmanager create avd \
-            -n GitHub_Android_37 \
-            -k "system-images;android-37;google_apis;x86_64" \
+            -n GitHub_Android_36 \
+            -k "system-images;android-36;google_apis;x86_64" \
             --force
 
       - name: Start Android emulator
         run: |
           nohup emulator \
-            -avd GitHub_Android_37 \
+            -avd GitHub_Android_36 \
             -no-window \
             -no-audio \
             -no-boot-anim \
