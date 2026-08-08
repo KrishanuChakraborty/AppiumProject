@@ -9,12 +9,16 @@ jobs:
 
     steps:
 
-      # 1. Checkout repository
+      # ---------------------------------------------------------
+      # 1. Checkout the repository
+      # ---------------------------------------------------------
       - name: Checkout code
         uses: actions/checkout@v4
 
 
+      # ---------------------------------------------------------
       # 2. Set up Java 21
+      # ---------------------------------------------------------
       - name: Set up Java 21
         uses: actions/setup-java@v4
         with:
@@ -23,59 +27,103 @@ jobs:
           cache: maven
 
 
+      # ---------------------------------------------------------
       # 3. Set up Android SDK
+      # ---------------------------------------------------------
       - name: Set up Android SDK
         uses: android-actions/setup-android@v4
 
 
+      # ---------------------------------------------------------
       # 4. Install Node.js
+      # ---------------------------------------------------------
       - name: Install Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '22'
 
 
+      # ---------------------------------------------------------
       # 5. Install Appium + UiAutomator2
+      # ---------------------------------------------------------
       - name: Install Appium
         run: |
           npm install -g appium
           appium driver install uiautomator2
 
-          echo "Appium version:"
+          echo "================================="
+          echo "Appium version"
+          echo "================================="
+
           appium --version
 
-          echo "Installed Appium drivers:"
+          echo ""
+          echo "================================="
+          echo "Installed Appium drivers"
+          echo "================================="
+
           appium driver list --installed
 
 
-      # 6. Start Android emulator
+      # ---------------------------------------------------------
+      # 6. Start Android Emulator
+      # ---------------------------------------------------------
       - name: Start Android emulator
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 35
+          api-level: 34
           target: google_apis
           arch: x86_64
           emulator-options: -no-window -no-audio -no-boot-anim
           disable-animations: true
 
           script: |
+
             echo "================================="
             echo "Android emulator started"
             echo "================================="
 
+            echo ""
             echo "Connected devices:"
             adb devices
 
+
+            # -------------------------------------------------
+            # Android version information
+            # -------------------------------------------------
+
             echo ""
             echo "Android version:"
+
             adb shell getprop ro.build.version.release
 
-            echo ""
-            echo "Android API:"
-            adb shell getprop ro.build.version.sdk
 
             echo ""
-            echo "Starting Appium server..."
+            echo "Android API level:"
+
+            adb shell getprop ro.build.version.sdk
+
+
+            # -------------------------------------------------
+            # Verify Android Settings service
+            # -------------------------------------------------
+
+            echo ""
+            echo "================================="
+            echo "Checking Android Settings service"
+            echo "================================="
+
+            adb shell settings get global animator_duration_scale
+
+
+            # -------------------------------------------------
+            # Start Appium server
+            # -------------------------------------------------
+
+            echo ""
+            echo "================================="
+            echo "Starting Appium server"
+            echo "================================="
 
             nohup appium --address 127.0.0.1 --port 4723 > appium.log 2>&1 &
 
@@ -83,10 +131,22 @@ jobs:
 
             sleep 10
 
+
+            # -------------------------------------------------
+            # Verify Appium server
+            # -------------------------------------------------
+
             echo ""
-            echo "Appium status:"
+            echo "================================="
+            echo "Checking Appium server"
+            echo "================================="
 
             curl --fail http://127.0.0.1:4723/status
+
+
+            # -------------------------------------------------
+            # Run ONLY FirstAppiumTest
+            # -------------------------------------------------
 
             echo ""
             echo "================================="
@@ -96,7 +156,9 @@ jobs:
             mvn -Dtest=FirstAppiumTest test
 
 
-      # 7. Upload Appium logs
+      # ---------------------------------------------------------
+      # 7. Upload Appium log
+      # ---------------------------------------------------------
       - name: Upload Appium logs
         if: always()
         uses: actions/upload-artifact@v4
