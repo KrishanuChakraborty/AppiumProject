@@ -8,9 +8,17 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+
+      # ---------------------------------------------------------
+      # 1. Checkout the repository
+      # ---------------------------------------------------------
       - name: Checkout code
         uses: actions/checkout@v4
 
+
+      # ---------------------------------------------------------
+      # 2. Set up Java 21
+      # ---------------------------------------------------------
       - name: Set up Java 21
         uses: actions/setup-java@v4
         with:
@@ -18,15 +26,27 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
+
+      # ---------------------------------------------------------
+      # 3. Set up Android SDK
+      # ---------------------------------------------------------
       - name: Set up Android SDK
         uses: android-actions/setup-android@v4
 
+
+      # ---------------------------------------------------------
+      # 4. Install Android SDK packages
+      # ---------------------------------------------------------
       - name: Install Android SDK packages
         run: |
           sdkmanager "platform-tools"
           sdkmanager "platforms;android-36"
           sdkmanager "system-images;android-36;google_apis;x86_64"
 
+
+      # ---------------------------------------------------------
+      # 5. Create Android Virtual Device
+      # ---------------------------------------------------------
       - name: Create Android emulator
         run: |
           echo "no" | avdmanager create avd \
@@ -34,47 +54,130 @@ jobs:
             -k "system-images;android-36;google_apis;x86_64" \
             --force
 
+
+      # ---------------------------------------------------------
+      # 6. Start Android emulator
+      # ---------------------------------------------------------
       - name: Start Android emulator
+        timeout-minutes: 5
         run: |
           nohup emulator \
             -avd GitHub_Android_36 \
             -no-window \
             -no-audio \
             -no-boot-anim \
+            -no-snapshot \
             -gpu swiftshader_indirect \
             > emulator.log 2>&1 &
 
+          echo "Waiting for emulator to appear..."
+
           adb wait-for-device
 
-          while [[ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" != "1" ]]; do
-            sleep 5
-          done
+          echo "Emulator detected. Waiting for Android to boot..."
+
+          timeout 300 bash -c '
+            while true; do
+              BOOT_COMPLETED=$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d "\r")
+
+              echo "Boot status: $BOOT_COMPLETED"
+
+              if [ "$BOOT_COMPLETED" = "1" ]; then
+                echo "Android boot completed."
+                break
+              fi
+
+              sleep 5
+            done
+          '
 
           adb shell input keyevent 82
 
+          echo "Android emulator is ready."
+
+
+      # ---------------------------------------------------------
+      # 7. Verify Android device
+      # ---------------------------------------------------------
       - name: Check Android device
         run: |
+          echo "Connected devices:"
           adb devices
+
+          echo ""
+          echo "Android version:"
+          adb shell getprop ro.build.version.release
+
+          echo ""
+          echo "Android API level:"
           adb shell getprop ro.build.version.sdk
 
+
+      # ---------------------------------------------------------
+      # 8. Install Node.js
+      # ---------------------------------------------------------
       - name: Install Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '22'
 
+
+      # ---------------------------------------------------------
+      # 9. Install Appium and UiAutomator2
+      # ---------------------------------------------------------
       - name: Install Appium
         run: |
           npm install -g appium
           appium driver install uiautomator2
 
+          echo "Appium version:"
+          appium --version
+
+          echo "Installed Appium drivers:"
+          appium driver list --installed
+
+
+      # ---------------------------------------------------------
+      # 10. Start Appium server
+      # ---------------------------------------------------------
       - name: Start Appium server
         run: |
-          nohup appium --address 127.0.0.1 --port 4723 > appium.log 2>&1 &
+          nohup appium \
+            --address 127.0.0.1 \
+            --port 4723 \
+            > appium.log 2>&1 &
 
-          sleep 5
+          echo "Waiting for Appium server..."
+
+          for i in {1..30}; do
+            if curl --silent --fail http://127.0.0.1:4723/status > /dev/null; then
+              echo "Appium server is ready."
+              break
+            fi
+
+            echo "Appium is not ready yet..."
+            sleep 2
+          done
 
           curl --fail http://127.0.0.1:4723/status
 
+
+      # ---------------------------------------------------------
+      # 11. Run ONLY FirstAppiumTest
+      # ---------------------------------------------------------
       - name: Run FirstAppiumTest
         run: |
           mvn -Dtest=FirstAppiumTest test
+
+
+      # ---------------------------------------------------------
+      # 12. Upload logs if something fails
+      # ---------------------------------------------------------
+      - name: Upload emulator and Appium logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: appium-debug-logs
+          path: |
+            emulator.log
+            appium.log
