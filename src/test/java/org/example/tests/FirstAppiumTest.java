@@ -21,7 +21,7 @@ public class FirstAppiumTest {
     @BeforeMethod
     public void setUp() throws MalformedURLException {
         UiAutomator2Options options = new UiAutomator2Options()
-                .setDeviceName("Pixel8_API35")
+                .setDeviceName(System.getProperty("deviceName", "Pixel_10_Pro"))
                 .setApp(Paths.get("src/test/resources/apps/android-demo.apk")
                         .toAbsolutePath().toString())
                 .setAutoGrantPermissions(true)
